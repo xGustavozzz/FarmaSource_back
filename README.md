@@ -82,10 +82,10 @@ FarmaSource_back/
 Crea un archivo `.env` en la raíz del proyecto backend:
 
 ```env
-PORT=3001
-DB_USER=admin_farmacia
-DB_PASSWORD=Oracle123
-DB_CONNECT_STRING=127.0.0.1:1521/farmaciapdb
+PORT=
+DB_USER=
+DB_PASSWORD=
+DB_CONNECT_STRING=
 ```
 
 ### 3. Instalar Dependencias
