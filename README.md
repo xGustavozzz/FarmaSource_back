@@ -102,9 +102,3 @@ El backend estará disponible en: `http://localhost:3001`.
 npm run build
 ```
 Genera la carpeta `dist/` con el código transpilado a JavaScript limpio.
-
----
-
-## 🤝 Contribuciones y Desarrollo
-
-Las consultas de lectura y modificaciones transaccionales deben seguir las directrices de inmutabilidad del sistema de auditoría. Asegúrate de verificar las restricciones de la base de datos antes de realizar cambios de esquema.
