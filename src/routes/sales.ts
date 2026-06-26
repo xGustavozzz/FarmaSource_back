@@ -164,7 +164,7 @@ router.post('/', async (req, res) => {
     // 3. Log in AUDIT_LOGS
     const insertAuditSql = `
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_DSP, AUD_USUARIO, AUD_FECHA)
-      VALUES ('VENTAS', 'CREACIÓN', :pk, :datos, :usuario, SYSTIMESTAMP)
+      VALUES ('VENTAS', 'INSERT', :pk, :datos, :usuario, SYSTIMESTAMP)
     `;
     await connection.execute(insertAuditSql, {
       pk: String(newSaleId),

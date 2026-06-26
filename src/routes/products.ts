@@ -117,7 +117,7 @@ router.post('/', requireRole('ADMINISTRADOR', 'FARMACEUTICO'), async (req, res) 
     // Log in AUDIT_LOGS
     await executeQuery(`
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_DSP, AUD_USUARIO, AUD_FECHA)
-      VALUES ('PRODUCTOS', 'CREACIÓN', :pk, :datos, :usuario, SYSTIMESTAMP)
+      VALUES ('PRODUCTOS', 'INSERT', :pk, :datos, :usuario, SYSTIMESTAMP)
     `, {
       pk: String(newId),
       datos: JSON.stringify({ name, price, stock }),
@@ -172,7 +172,7 @@ router.put('/:id', requireRole('ADMINISTRADOR', 'FARMACEUTICO'), async (req, res
     // Log in AUDIT_LOGS
     await executeQuery(`
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_ANT, AUD_DATOS_DSP, AUD_USUARIO, AUD_FECHA)
-      VALUES ('PRODUCTOS', 'EDICIÓN', :pk, :ant, :dsp, :usuario, SYSTIMESTAMP)
+      VALUES ('PRODUCTOS', 'UPDATE', :pk, :ant, :dsp, :usuario, SYSTIMESTAMP)
     `, {
       pk: String(id),
       ant: prev ? JSON.stringify(prev) : null,
@@ -202,7 +202,7 @@ router.delete('/:id', requireRole('ADMINISTRADOR', 'FARMACEUTICO'), async (req, 
     // Log in AUDIT_LOGS
     await executeQuery(`
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_ANT, AUD_USUARIO, AUD_FECHA)
-      VALUES ('PRODUCTOS', 'ELIMINACIÓN', :pk, :ant, :usuario, SYSTIMESTAMP)
+      VALUES ('PRODUCTOS', 'DELETE', :pk, :ant, :usuario, SYSTIMESTAMP)
     `, {
       pk: String(id),
       ant: prev ? JSON.stringify(prev) : null,
@@ -226,9 +226,10 @@ router.post('/replenish', requireRole('ADMINISTRADOR', 'FARMACEUTICO'), async (r
       WHERE PRO_STOCK <= 10
     `);
 
+    // Log in AUDIT_LOGS
     await executeQuery(`
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_DSP, AUD_USUARIO, AUD_FECHA)
-      VALUES ('PRODUCTOS', 'REABASTECIMIENTO', 'GLOBAL', 'Reabastecimiento de stock crítico (+50 unidades)', :usuario, SYSTIMESTAMP)
+      VALUES ('PRODUCTOS', 'UPDATE', 'GLOBAL', 'Reabastecimiento de stock crítico (+50 unidades)', :usuario, SYSTIMESTAMP)
     `, {
       usuario: username
     });

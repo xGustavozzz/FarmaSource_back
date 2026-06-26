@@ -51,13 +51,26 @@ router.post('/', async (req, res) => {
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
 
   try {
+    let normalizedAction = String(action || 'UPDATE').trim().toUpperCase();
+    if (normalizedAction === 'CREACIÓN' || normalizedAction === 'CREACION') {
+      normalizedAction = 'INSERT';
+    } else if (normalizedAction === 'EDICIÓN' || normalizedAction === 'EDICION' || normalizedAction === 'LOGIN') {
+      normalizedAction = 'UPDATE';
+    } else if (normalizedAction === 'INACTIVACIÓN' || normalizedAction === 'INACTIVACION') {
+      normalizedAction = 'DELETE';
+    }
+    
+    if (normalizedAction !== 'INSERT' && normalizedAction !== 'UPDATE' && normalizedAction !== 'DELETE') {
+      normalizedAction = 'UPDATE';
+    }
+
     const sql = `
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_ANT, AUD_DATOS_DSP, AUD_USUARIO, AUD_IP, AUD_FECHA)
-      VALUES (:table, :action, :registerId, :previous, :posterior, :username, :ip, SYSTIMESTAMP)
+      VALUES (:table, :normalizedAction, :registerId, :previous, :posterior, :username, :ip, SYSTIMESTAMP)
     `;
     await executeQuery(sql, {
       table,
-      action,
+      normalizedAction,
       registerId: registerId || null,
       previous: previous ? JSON.stringify(previous) : null,
       posterior: posterior ? JSON.stringify(posterior) : null,

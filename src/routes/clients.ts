@@ -138,7 +138,7 @@ router.post('/', async (req, res) => {
     // Log in AUDIT_LOGS
     await executeQuery(`
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_DSP, AUD_USUARIO, AUD_FECHA)
-      VALUES ('CLIENTES', 'CREACIÓN', :pk, :datos, :usuario, SYSTIMESTAMP)
+      VALUES ('CLIENTES', 'INSERT', :pk, :datos, :usuario, SYSTIMESTAMP)
     `, {
       pk: String(newId),
       datos: JSON.stringify({ name: `${firstName} ${lastName}`, cedula }),
@@ -192,7 +192,7 @@ router.put('/:id', async (req, res) => {
     // Log in AUDIT_LOGS
     await executeQuery(`
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_ANT, AUD_DATOS_DSP, AUD_USUARIO, AUD_FECHA)
-      VALUES ('CLIENTES', 'EDICIÓN', :pk, :ant, :dsp, :usuario, SYSTIMESTAMP)
+      VALUES ('CLIENTES', 'UPDATE', :pk, :ant, :dsp, :usuario, SYSTIMESTAMP)
     `, {
       pk: String(id),
       ant: prev ? JSON.stringify(prev) : null,
@@ -218,7 +218,7 @@ router.delete('/:id', async (req, res) => {
     // Log in AUDIT_LOGS
     await executeQuery(`
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_DSP, AUD_USUARIO, AUD_FECHA)
-      VALUES ('CLIENTES', 'INACTIVACIÓN', :pk, 'Activo establecido a N', :usuario, SYSTIMESTAMP)
+      VALUES ('CLIENTES', 'UPDATE', :pk, 'Activo establecido a N', :usuario, SYSTIMESTAMP)
     `, {
       pk: String(id),
       usuario: username

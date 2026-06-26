@@ -130,7 +130,7 @@ router.post('/', async (req, res) => {
     // Log in AUDIT_LOGS
     await executeQuery(`
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_DSP, AUD_USUARIO, AUD_FECHA)
-      VALUES ('EMPLEADOS', 'CREACIÓN', :pk, :datos, :usuario, SYSTIMESTAMP)
+      VALUES ('EMPLEADOS', 'INSERT', :pk, :datos, :usuario, SYSTIMESTAMP)
     `, {
       pk: String(newId),
       datos: JSON.stringify({ name: `${firstName} ${lastName}`, role }),
@@ -183,7 +183,7 @@ router.put('/:id', async (req, res) => {
     // Log in AUDIT_LOGS
     await executeQuery(`
       INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_ANT, AUD_DATOS_DSP, AUD_USUARIO, AUD_FECHA)
-      VALUES ('EMPLEADOS', 'EDICIÓN', :pk, :ant, :dsp, :usuario, SYSTIMESTAMP)
+      VALUES ('EMPLEADOS', 'UPDATE', :pk, :ant, :dsp, :usuario, SYSTIMESTAMP)
     `, {
       pk: String(id),
       ant: prev ? JSON.stringify(prev) : null,

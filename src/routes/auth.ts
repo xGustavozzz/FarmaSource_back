@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
     try {
       await executeQuery(`
         INSERT INTO AUDIT_LOGS (AUD_TABLA, AUD_ACCION, AUD_PK_VALOR, AUD_DATOS_DSP, AUD_USUARIO, AUD_FECHA)
-        VALUES ('USUARIOS_APP', 'LOGIN', :username, 'Usuario inició sesión exitosamente', :username, SYSTIMESTAMP)
+        VALUES ('USUARIOS_APP', 'UPDATE', :username, 'Usuario inició sesión exitosamente', :username, SYSTIMESTAMP)
       `, { username: user.USU_USERNAME });
     } catch (auditErr) {
       console.error('Failed to write audit log for login:', auditErr);
