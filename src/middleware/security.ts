@@ -16,6 +16,9 @@ export function normalizeRole(role: string): string {
   if (r === 'REGENTE FARMACÉUTICO' || r === 'REGENTE' || r === 'FARMACEUTICO') {
     return 'FARMACEUTICO';
   }
+  if (r === 'CAJERO' || r === 'VENDEDOR') {
+    return 'VENDEDOR';
+  }
   return r;
 }
 
@@ -47,59 +50,13 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
         fullName: `${dbUser.EMP_NOMBRE || ''} ${dbUser.EMP_APELLIDO || ''}`.trim()
       };
       return next();
+    } else {
+      return res.status(401).json({ message: 'Usuario no encontrado o inactivo en la base de datos.' });
     }
-  } catch (dbErr) {
-    console.error('Database connection or query failed in authMiddleware, falling back to mock logic:', dbErr);
+  } catch (dbErr: any) {
+    console.error('Database connection or query failed in authMiddleware:', dbErr);
+    return res.status(500).json({ message: 'Error de base de datos en autenticación', error: dbErr.message });
   }
-
-  // Fallback / Mock auth logic if DB is offline or user not in DB (for local evaluation robust testing)
-  const mockUserMap: Record<string, { role: string; fullName: string }> = {
-    'r.alarcon.farm': { role: 'ADMINISTRADOR', fullName: 'Dr. Ricardo Alarcón' },
-    'e.martinez.reg': { role: 'FARMACEUTICO', fullName: 'Elena Martínez' },
-    'c.ruiz.sales': { role: 'VENDEDOR', fullName: 'Carlos Ruiz' },
-    'l.mendez.pos': { role: 'CAJERO', fullName: 'Lucía Méndez' },
-    'j.santacruz.aud': { role: 'AUDITOR', fullName: 'Jorge Santacruz' },
-    'admin.secure': { role: 'ADMINISTRADOR', fullName: 'Admin FarmaSecure' },
-    'admin_farmacia': { role: 'ADMINISTRADOR', fullName: 'Oracle Admin' }
-  };
-
-  const matched = mockUserMap[username.toLowerCase()];
-  if (matched) {
-    (req as any).user = {
-      username,
-      role: matched.role,
-      fullName: matched.fullName
-    };
-    return next();
-  }
-
-  // If username matches general patterns (e.g. contains 'admin', 'sales', 'reg', 'pos', 'aud')
-  let role = 'CLIENTE';
-  let fullName = 'Usuario General';
-  if (username.includes('admin')) {
-    role = 'ADMINISTRADOR';
-    fullName = 'Administrador Mock';
-  } else if (username.includes('reg') || username.includes('farm')) {
-    role = 'FARMACEUTICO';
-    fullName = 'Farmacéutico Mock';
-  } else if (username.includes('sales') || username.includes('vend')) {
-    role = 'VENDEDOR';
-    fullName = 'Vendedor Mock';
-  } else if (username.includes('pos') || username.includes('caj')) {
-    role = 'CAJERO';
-    fullName = 'Cajero Mock';
-  } else if (username.includes('aud')) {
-    role = 'AUDITOR';
-    fullName = 'Auditor Mock';
-  }
-
-  (req as any).user = {
-    username,
-    role,
-    fullName
-  };
-
-  next();
 }
 
 export function requireRole(...allowedRoles: string[]) {

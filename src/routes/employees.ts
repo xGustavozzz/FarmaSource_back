@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { executeQuery } from '../config/db';
 import oracledb from 'oracledb';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 
@@ -14,18 +15,26 @@ router.get('/', async (req, res) => {
       ORDER BY EMP_ID DESC
     `;
     const result = await executeQuery<any>(sql);
-    const employees = result.rows?.map((row: any) => ({
-      id: row.EMP_ID,
-      firstName: row.EMP_NOMBRE,
-      lastName: row.EMP_APELLIDO,
-      name: `${row.EMP_NOMBRE || ''} ${row.EMP_APELLIDO || ''}`.trim(),
-      cedula: row.EMP_CEDULA,
-      role: row.EMP_CARGO, // ROL/CARGO
-      phone: row.EMP_TELEFONO,
-      email: row.EMP_EMAIL,
-      salary: row.EMP_SALARIO,
-      isActive: row.EMP_ACTIVO === 'S'
-    })) || [];
+    const employees = result.rows?.map((row: any) => {
+      let roleDisplay = row.EMP_CARGO;
+      if (roleDisplay === 'ADMINISTRADOR') roleDisplay = 'Administrador';
+      else if (roleDisplay === 'FARMACEUTICO') roleDisplay = 'Regente Farmacéutico';
+      else if (roleDisplay === 'VENDEDOR' || roleDisplay === 'CAJERO') roleDisplay = 'Vendedor';
+      else if (roleDisplay === 'AUDITOR') roleDisplay = 'Auditor';
+
+      return {
+        id: row.EMP_ID,
+        firstName: row.EMP_NOMBRE,
+        lastName: row.EMP_APELLIDO,
+        name: `${row.EMP_NOMBRE || ''} ${row.EMP_APELLIDO || ''}`.trim(),
+        cedula: row.EMP_CEDULA,
+        role: roleDisplay, // ROL/CARGO
+        phone: row.EMP_TELEFONO,
+        email: row.EMP_EMAIL,
+        salary: row.EMP_SALARIO,
+        isActive: row.EMP_ACTIVO === 'S'
+      };
+    }) || [];
     res.json(employees);
   } catch (err: any) {
     console.error('Error fetching employees:', err);
@@ -47,13 +56,54 @@ router.post('/', async (req, res) => {
     if (roleDb === 'REGENTE FARMACÉUTICO' || roleDb === 'REGENTE' || roleDb === 'FARMACEUTICO') {
       roleDb = 'FARMACEUTICO';
     }
+    if (roleDb === 'CAJERO' || roleDb === 'VENDEDOR') {
+      roleDb = 'VENDEDOR'; // Cajero integrated into Vendedor
+    }
 
-    // Auto-generate username
+    // Auto-generate username: primera_letra_nombre.primer_apellido.ultimo_digito_cedula (with collision handling)
     const cleanFirst = String(firstName).trim().substring(0, 1).toLowerCase();
-    const cleanLast = String(lastName).trim().split(' ')[0].toLowerCase();
-    const generatedUsername = `${cleanFirst}.${cleanLast}.${Date.now().toString().slice(-3)}`;
+    const cleanLast = String(lastName).trim().split(/\s+/)[0].toLowerCase();
+    const base = `${cleanFirst}.${cleanLast}`;
+    
+    let generatedUsername = '';
+    let successGen = false;
+    const cleanCedula = String(cedula).trim();
+
+    for (let i = 1; i <= cleanCedula.length; i++) {
+      const suffix = cleanCedula.slice(-i);
+      const candidate = `${base}.${suffix}`;
+      
+      const checkRes = await executeQuery<any>(
+        "SELECT COUNT(*) AS CNT FROM USUARIOS_APP WHERE USU_USERNAME = :candidate",
+        { candidate }
+      );
+      const count = checkRes.rows?.[0]?.CNT || 0;
+      if (count === 0) {
+        generatedUsername = candidate;
+        successGen = true;
+        break;
+      }
+    }
+    
+    if (!successGen) {
+      let counter = 1;
+      while (true) {
+        const candidate = `${base}.${cleanCedula}_${counter}`;
+        const checkRes = await executeQuery<any>(
+          "SELECT COUNT(*) AS CNT FROM USUARIOS_APP WHERE USU_USERNAME = :candidate",
+          { candidate }
+        );
+        const count = checkRes.rows?.[0]?.CNT || 0;
+        if (count === 0) {
+          generatedUsername = candidate;
+          break;
+        }
+        counter++;
+      }
+    }
+
     const emailVal = email || `${generatedUsername}@farmacia.com`;
-    const dummyHash = 'pbkdf2_sha256$260000$salt$' + Math.random().toString(36).substring(2, 15);
+    const defaultPasswordHash = bcrypt.hashSync('admin123', 12);
 
     try {
       // Try PL/SQL Procedure first
@@ -86,7 +136,7 @@ router.post('/', async (req, res) => {
         salary: Number(salary || 0),
         username: generatedUsername,
         emailUser: emailVal,
-        passwordHash: dummyHash,
+        passwordHash: defaultPasswordHash,
         rolPrincipal: roleDb,
         empId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT },
         usuId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
@@ -111,7 +161,7 @@ router.post('/', async (req, res) => {
         firstName,
         lastName,
         cedula,
-        role,
+        role: roleDb,
         phone: phone || null,
         email: email || null,
         salary: Number(salary || 0),
