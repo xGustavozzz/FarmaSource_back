@@ -1,22 +1,38 @@
 import { Router } from 'express';
 import { executeQuery } from '../config/db';
 import oracledb from 'oracledb';
+import { requireRole } from '../middleware/security';
 
 const router = Router();
 
 // GET all products
 router.get('/', async (req, res) => {
   try {
-    const sql = `
-      SELECT p.PRO_ID, p.PRO_CAT_ID, p.PRO_PROV_ID, p.PRO_NOMBRE, p.PRO_DESCRIPCION,
-             p.PRO_LABORATORIO, p.PRO_PRESENTACION, p.PRO_PRECIO_COMPRA, p.PRO_PRECIO_VENTA, p.PRO_STOCK,
-             c.CAT_NOMBRE, pr.PROV_RAZON_SOCIAL
-      FROM PRODUCTOS p
-      LEFT JOIN CATEGORIAS c ON p.PRO_CAT_ID = c.CAT_ID
-      LEFT JOIN PROVEEDORES pr ON p.PRO_PROV_ID = pr.PROV_ID
-      ORDER BY p.PRO_ID DESC
-    `;
-    const result = await executeQuery<any>(sql);
+    let result;
+    try {
+      const sql = `
+        SELECT v.PRO_ID, v.PRO_NOMBRE, v.PRO_DESCRIPCION, v.PRO_LABORATORIO, v.PRO_PRESENTACION,
+               v.CATEGORIA as CAT_NOMBRE, v.PRO_PRECIO_VENTA, v.PRO_STOCK, v.PRO_REQUIERE_RECETA, v.PRO_ACTIVO,
+               p.PRO_CAT_ID, p.PRO_PROV_ID, p.PRO_PRECIO_COMPRA, pr.PROV_RAZON_SOCIAL
+        FROM V_PRODUCTOS_CATALOGO v
+        LEFT JOIN PRODUCTOS p ON v.PRO_ID = p.PRO_ID
+        LEFT JOIN PROVEEDORES pr ON p.PRO_PROV_ID = pr.PROV_ID
+        ORDER BY v.PRO_ID DESC
+      `;
+      result = await executeQuery<any>(sql);
+    } catch (err) {
+      console.warn('V_PRODUCTOS_CATALOGO not available, falling back to base table query:', err);
+      const sqlFallback = `
+        SELECT p.PRO_ID, p.PRO_CAT_ID, p.PRO_PROV_ID, p.PRO_NOMBRE, p.PRO_DESCRIPCION,
+               p.PRO_LABORATORIO, p.PRO_PRESENTACION, p.PRO_PRECIO_COMPRA, p.PRO_PRECIO_VENTA, p.PRO_STOCK,
+               c.CAT_NOMBRE, pr.PROV_RAZON_SOCIAL, 'N' AS PRO_REQUIERE_RECETA, p.PRO_ACTIVO
+        FROM PRODUCTOS p
+        LEFT JOIN CATEGORIAS c ON p.PRO_CAT_ID = c.CAT_ID
+        LEFT JOIN PROVEEDORES pr ON p.PRO_PROV_ID = pr.PROV_ID
+        ORDER BY p.PRO_ID DESC
+      `;
+      result = await executeQuery<any>(sqlFallback);
+    }
     const products = result.rows?.map((row: any) => ({
       id: row.PRO_ID,
       catId: row.PRO_CAT_ID,
@@ -29,7 +45,8 @@ router.get('/', async (req, res) => {
       price: row.PRO_PRECIO_VENTA,
       stock: row.PRO_STOCK,
       categoryName: row.CAT_NOMBRE,
-      providerName: row.PROV_RAZON_SOCIAL
+      providerName: row.PROV_RAZON_SOCIAL,
+      requiereReceta: row.PRO_REQUIERE_RECETA === 'S'
     })) || [];
     res.json(products);
   } catch (err: any) {
@@ -71,7 +88,7 @@ router.get('/providers', async (req, res) => {
 });
 
 // POST create product
-router.post('/', async (req, res) => {
+router.post('/', requireRole('ADMINISTRADOR', 'FARMACEUTICO'), async (req, res) => {
   const { catId, provId, name, description, laboratory, presentation, purchasePrice, price, stock } = req.body;
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
   
@@ -115,7 +132,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update product
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('ADMINISTRADOR', 'FARMACEUTICO'), async (req, res) => {
   const { id } = req.params;
   const { catId, provId, name, description, laboratory, presentation, purchasePrice, price, stock } = req.body;
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
@@ -171,7 +188,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE product
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('ADMINISTRADOR', 'FARMACEUTICO'), async (req, res) => {
   const { id } = req.params;
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
 
@@ -200,7 +217,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST replenish critical stock
-router.post('/replenish', async (req, res) => {
+router.post('/replenish', requireRole('ADMINISTRADOR', 'FARMACEUTICO'), async (req, res) => {
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
   try {
     await executeQuery(`

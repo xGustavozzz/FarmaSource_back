@@ -6,13 +6,27 @@ const router = Router();
 // GET all audit logs
 router.get('/', async (req, res) => {
   try {
-    const sql = `
-      SELECT AUD_ID, AUD_TABLA, AUD_ACCION, AUD_PK_VALOR,
-             AUD_DATOS_ANT, AUD_DATOS_DSP, AUD_USUARIO, AUD_IP, AUD_FECHA
-      FROM AUDIT_LOGS
-      ORDER BY AUD_FECHA DESC
-    `;
-    const result = await executeQuery<any>(sql);
+    let result;
+    try {
+      const sql = `
+        SELECT v.AUD_ID, v.AUD_TABLA, v.AUD_ACCION, v.AUD_PK_VALOR,
+               v.AUD_USUARIO, v.AUD_IP, v.AUD_FECHA,
+               a.AUD_DATOS_ANT, a.AUD_DATOS_DSP
+        FROM V_AUDIT_RESUMEN v
+        LEFT JOIN AUDIT_LOGS a ON v.AUD_ID = a.AUD_ID
+        ORDER BY v.AUD_FECHA DESC
+      `;
+      result = await executeQuery<any>(sql);
+    } catch (err) {
+      console.warn('V_AUDIT_RESUMEN not available, falling back to base table query:', err);
+      const sqlFallback = `
+        SELECT AUD_ID, AUD_TABLA, AUD_ACCION, AUD_PK_VALOR,
+               AUD_DATOS_ANT, AUD_DATOS_DSP, AUD_USUARIO, AUD_IP, AUD_FECHA
+        FROM AUDIT_LOGS
+        ORDER BY AUD_FECHA DESC
+      `;
+      result = await executeQuery<any>(sqlFallback);
+    }
     const logs = result.rows?.map((row: any) => ({
       id: row.AUD_ID,
       table: row.AUD_TABLA,

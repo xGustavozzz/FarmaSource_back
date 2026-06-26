@@ -36,27 +36,96 @@ router.get('/', async (req, res) => {
 // POST create employee
 router.post('/', async (req, res) => {
   const { firstName, lastName, cedula, role, phone, email, salary } = req.body;
-  const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
+  const usernameHeader = (req.headers['x-user-username'] as string) || 'SYSTEM';
 
   try {
-    const sql = `
-      INSERT INTO EMPLEADOS (EMP_NOMBRE, EMP_APELLIDO, EMP_CEDULA, EMP_CARGO, EMP_TELEFONO, EMP_EMAIL, EMP_SALARIO, EMP_ACTIVO, EMP_CREATED_AT, EMP_UPDATED_AT)
-      VALUES (:firstName, :lastName, :cedula, :role, :phone, :email, :salary, 'S', SYSTIMESTAMP, SYSTIMESTAMP)
-      RETURNING EMP_ID INTO :id
-    `;
-    
-    const result = await executeQuery<any>(sql, {
-      firstName,
-      lastName,
-      cedula,
-      role,
-      phone: phone || null,
-      email: email || null,
-      salary: Number(salary || 0),
-      id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
-    });
+    let newId;
+    let newUsuId;
 
-    const newId = result.outBinds?.id?.[0];
+    // Normalize the role for the DB
+    let roleDb = String(role).toUpperCase();
+    if (roleDb === 'REGENTE FARMACÉUTICO' || roleDb === 'REGENTE' || roleDb === 'FARMACEUTICO') {
+      roleDb = 'FARMACEUTICO';
+    }
+
+    // Auto-generate username
+    const cleanFirst = String(firstName).trim().substring(0, 1).toLowerCase();
+    const cleanLast = String(lastName).trim().split(' ')[0].toLowerCase();
+    const generatedUsername = `${cleanFirst}.${cleanLast}.${Date.now().toString().slice(-3)}`;
+    const emailVal = email || `${generatedUsername}@farmacia.com`;
+    const dummyHash = 'pbkdf2_sha256$260000$salt$' + Math.random().toString(36).substring(2, 15);
+
+    try {
+      // Try PL/SQL Procedure first
+      const plsql = `
+        BEGIN
+          pkg_procesos_app.registrar_empleado_con_usuario(
+            p_nombre => :firstName,
+            p_apellido => :lastName,
+            p_cedula => :cedula,
+            p_cargo => :role,
+            p_telefono => :phone,
+            p_email_emp => :email,
+            p_salario => :salary,
+            p_username => :username,
+            p_email_usuario => :emailUser,
+            p_password_hash => :passwordHash,
+            p_rol_principal => :rolPrincipal,
+            p_emp_id => :empId,
+            p_usu_id => :usuId
+          );
+        END;
+      `;
+      const result = await executeQuery<any>(plsql, {
+        firstName,
+        lastName,
+        cedula,
+        role: roleDb,
+        phone: phone || null,
+        email: emailVal,
+        salary: Number(salary || 0),
+        username: generatedUsername,
+        emailUser: emailVal,
+        passwordHash: dummyHash,
+        rolPrincipal: roleDb,
+        empId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT },
+        usuId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
+      });
+
+      newId = result.outBinds?.empId;
+      if (Array.isArray(newId)) {
+        newId = newId[0];
+      }
+      newUsuId = result.outBinds?.usuId;
+      if (Array.isArray(newUsuId)) {
+        newUsuId = newUsuId[0];
+      }
+    } catch (procErr: any) {
+      console.warn('PL/SQL registrar_empleado_con_usuario failed, trying direct insert fallback:', procErr);
+      const sqlFallback = `
+        INSERT INTO EMPLEADOS (EMP_NOMBRE, EMP_APELLIDO, EMP_CEDULA, EMP_CARGO, EMP_TELEFONO, EMP_EMAIL, EMP_SALARIO, EMP_ACTIVO, EMP_CREATED_AT, EMP_UPDATED_AT)
+        VALUES (:firstName, :lastName, :cedula, :role, :phone, :email, :salary, 'S', SYSTIMESTAMP, SYSTIMESTAMP)
+        RETURNING EMP_ID INTO :id
+      `;
+      const result = await executeQuery<any>(sqlFallback, {
+        firstName,
+        lastName,
+        cedula,
+        role,
+        phone: phone || null,
+        email: email || null,
+        salary: Number(salary || 0),
+        id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
+      });
+      newId = result.outBinds?.id;
+      if (Array.isArray(newId)) {
+        newId = newId[0];
+      }
+    }
+
+    if (!newId) {
+      throw new Error('No se pudo obtener el ID del empleado registrado.');
+    }
 
     // Log in AUDIT_LOGS
     await executeQuery(`
@@ -65,7 +134,7 @@ router.post('/', async (req, res) => {
     `, {
       pk: String(newId),
       datos: JSON.stringify({ name: `${firstName} ${lastName}`, role }),
-      usuario: username
+      usuario: usernameHeader
     });
 
     res.status(201).json({ id: newId, message: 'Empleado creado exitosamente' });

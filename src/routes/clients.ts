@@ -7,15 +7,29 @@ const router = Router();
 // GET all clients
 router.get('/', async (req, res) => {
   try {
-    const sql = `
-      SELECT c.CLI_ID, c.CLI_CIU_ID, c.CLI_NOMBRE, c.CLI_APELLIDO, c.CLI_CEDULA,
-             c.CLI_TELEFONO, c.CLI_EMAIL, c.CLI_DIRECCION, c.CLI_FECHA_NAC, c.CLI_ACTIVO,
-             ci.CIU_NOMBRE
-      FROM CLIENTES c
-      LEFT JOIN CIUDADES ci ON c.CLI_CIU_ID = ci.CIU_ID
-      ORDER BY c.CLI_ID DESC
-    `;
-    const result = await executeQuery<any>(sql);
+    let result;
+    try {
+      const sql = `
+        SELECT v.CLI_ID, v.CLI_NOMBRE, v.CLI_APELLIDO, v.CLI_CEDULA, v.CLI_TELEFONO,
+               v.CLI_EMAIL, v.CLI_DIRECCION, v.CIUDAD as CIU_NOMBRE, v.PROVINCIA, v.PAIS, v.CLI_ACTIVO,
+               c.CLI_CIU_ID, c.CLI_FECHA_NAC
+        FROM V_CLIENTES_COMPLETO v
+        LEFT JOIN CLIENTES c ON v.CLI_ID = c.CLI_ID
+        ORDER BY v.CLI_ID DESC
+      `;
+      result = await executeQuery<any>(sql);
+    } catch (err) {
+      console.warn('V_CLIENTES_COMPLETO not available, falling back to base table query:', err);
+      const sqlFallback = `
+        SELECT c.CLI_ID, c.CLI_CIU_ID, c.CLI_NOMBRE, c.CLI_APELLIDO, c.CLI_CEDULA,
+               c.CLI_TELEFONO, c.CLI_EMAIL, c.CLI_DIRECCION, c.CLI_FECHA_NAC, c.CLI_ACTIVO,
+               ci.CIU_NOMBRE, ci.CIU_PROVINCIA AS PROVINCIA, 'Paraguay' AS PAIS
+        FROM CLIENTES c
+        LEFT JOIN CIUDADES ci ON c.CLI_CIU_ID = ci.CIU_ID
+        ORDER BY c.CLI_ID DESC
+      `;
+      result = await executeQuery<any>(sqlFallback);
+    }
     const clients = result.rows?.map((row: any) => ({
       id: row.CLI_ID,
       ciuId: row.CLI_CIU_ID,
@@ -28,7 +42,9 @@ router.get('/', async (req, res) => {
       address: row.CLI_DIRECCION,
       birthDate: row.CLI_FECHA_NAC,
       isActive: row.CLI_ACTIVO === 'S',
-      cityName: row.CIU_NOMBRE
+      cityName: row.CIU_NOMBRE,
+      provincia: row.PROVINCIA,
+      pais: row.PAIS
     })) || [];
     res.json(clients);
   } catch (err: any) {
@@ -58,25 +74,66 @@ router.post('/', async (req, res) => {
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
 
   try {
-    const sql = `
-      INSERT INTO CLIENTES (CLI_CIU_ID, CLI_NOMBRE, CLI_APELLIDO, CLI_CEDULA, CLI_TELEFONO, CLI_EMAIL, CLI_DIRECCION, CLI_FECHA_NAC, CLI_ACTIVO, CLI_CREATED_AT)
-      VALUES (:ciuId, :firstName, :lastName, :cedula, :phone, :email, :address, TO_DATE(:birthDate, 'YYYY-MM-DD'), 'S', SYSTIMESTAMP)
-      RETURNING CLI_ID INTO :id
-    `;
-    
-    const result = await executeQuery<any>(sql, {
-      ciuId: ciuId ? Number(ciuId) : null,
-      firstName,
-      lastName,
-      cedula,
-      phone: phone || null,
-      email: email || null,
-      address: address || null,
-      birthDate: birthDate ? birthDate.substring(0, 10) : null,
-      id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
-    });
+    let newId;
+    try {
+      // Try PL/SQL Procedure first
+      const plsql = `
+        BEGIN
+          pkg_procesos_app.registrar_cliente(
+            p_ciu_id => :ciuId,
+            p_nombre => :firstName,
+            p_apellido => :lastName,
+            p_cedula => :cedula,
+            p_telefono => :phone,
+            p_email => :email,
+            p_direccion => :address,
+            p_fecha_nac => TO_DATE(:birthDate, 'YYYY-MM-DD'),
+            p_cli_id => :id
+          );
+        END;
+      `;
+      const result = await executeQuery<any>(plsql, {
+        ciuId: ciuId ? Number(ciuId) : null,
+        firstName,
+        lastName,
+        cedula,
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+        birthDate: birthDate ? birthDate.substring(0, 10) : null,
+        id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
+      });
+      newId = result.outBinds?.id;
+      if (Array.isArray(newId)) {
+        newId = newId[0];
+      }
+    } catch (procErr: any) {
+      console.warn('PL/SQL registrar_cliente failed, trying direct insert fallback:', procErr);
+      const sqlFallback = `
+        INSERT INTO CLIENTES (CLI_CIU_ID, CLI_NOMBRE, CLI_APELLIDO, CLI_CEDULA, CLI_TELEFONO, CLI_EMAIL, CLI_DIRECCION, CLI_FECHA_NAC, CLI_ACTIVO, CLI_CREATED_AT)
+        VALUES (:ciuId, :firstName, :lastName, :cedula, :phone, :email, :address, TO_DATE(:birthDate, 'YYYY-MM-DD'), 'S', SYSTIMESTAMP)
+        RETURNING CLI_ID INTO :id
+      `;
+      const result = await executeQuery<any>(sqlFallback, {
+        ciuId: ciuId ? Number(ciuId) : null,
+        firstName,
+        lastName,
+        cedula,
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+        birthDate: birthDate ? birthDate.substring(0, 10) : null,
+        id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
+      });
+      newId = result.outBinds?.id;
+      if (Array.isArray(newId)) {
+        newId = newId[0];
+      }
+    }
 
-    const newId = result.outBinds?.id?.[0];
+    if (!newId) {
+      throw new Error('No se pudo obtener el ID del cliente registrado.');
+    }
 
     // Log in AUDIT_LOGS
     await executeQuery(`
