@@ -67,8 +67,6 @@ FarmaSource_back/
 | **Nómina** | `GET`/`POST`/`PUT` `/employees` | ✅ | ❌ | ❌ | ❌ |
 | **Bitácoras** | `GET` `/audit` | ✅ | ❌ | ❌ | ✅ |
 
-> [!NOTE]
-> Los roles de **Cajero** y **Vendedor** se unificaron bajo la política de permisos del rol comercial **Vendedor**. El sistema los trata de forma equivalente en todas las capas.
 
 ---
 
