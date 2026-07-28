@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireRole } from '../middleware/security';
 import { executeQuery } from '../config/db';
 import oracledb from 'oracledb';
 
@@ -69,7 +70,7 @@ router.get('/cities', async (req, res) => {
 });
 
 // POST create client
-router.post('/', async (req, res) => {
+router.post('/', requireRole('ADMINISTRADOR', 'VENDEDOR', 'CAJERO'), async (req, res) => {
   const { ciuId, firstName, lastName, cedula, phone, email, address, birthDate } = req.body;
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
 
@@ -153,7 +154,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update client
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('ADMINISTRADOR', 'VENDEDOR', 'CAJERO'), async (req, res) => {
   const { id } = req.params;
   const { ciuId, firstName, lastName, cedula, phone, email, address, birthDate, isActive } = req.body;
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
@@ -208,7 +209,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE client (Inactivation)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('ADMINISTRADOR', 'VENDEDOR', 'CAJERO'), async (req, res) => {
   const { id } = req.params;
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
 

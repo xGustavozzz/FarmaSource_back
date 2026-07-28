@@ -14,6 +14,7 @@ router.get('/', async (req, res) => {
                a.AUD_DATOS_ANT, a.AUD_DATOS_DSP
         FROM V_AUDIT_RESUMEN v
         LEFT JOIN AUDIT_LOGS a ON v.AUD_ID = a.AUD_ID
+        WHERE v.AUD_USUARIO <> 'ADMIN_FARMACIA'
         ORDER BY v.AUD_FECHA DESC
       `;
       result = await executeQuery<any>(sql);
@@ -23,6 +24,7 @@ router.get('/', async (req, res) => {
         SELECT AUD_ID, AUD_TABLA, AUD_ACCION, AUD_PK_VALOR,
                AUD_DATOS_ANT, AUD_DATOS_DSP, AUD_USUARIO, AUD_IP, AUD_FECHA
         FROM AUDIT_LOGS
+        WHERE AUD_USUARIO <> 'ADMIN_FARMACIA'
         ORDER BY AUD_FECHA DESC
       `;
       result = await executeQuery<any>(sqlFallback);

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireRole } from '../middleware/security';
 import oracledb from 'oracledb';
 import { executeQuery } from '../config/db';
 
@@ -13,11 +14,11 @@ router.get('/', async (req, res) => {
              v.VEN_ESTADO, v.VEN_OBSERVACIONES,
              c.CLI_NOMBRE, c.CLI_APELLIDO,
              e.EMP_NOMBRE, e.EMP_APELLIDO,
-             f.FPA_DESCRIPCION
+             f.FPG_NOMBRE
       FROM VENTAS v
       LEFT JOIN CLIENTES c ON v.VEN_CLI_ID = c.CLI_ID
       LEFT JOIN EMPLEADOS e ON v.VEN_EMP_ID = e.EMP_ID
-      LEFT JOIN FORMAS_PAGO f ON v.VEN_FPAGO_ID = f.FPA_ID
+      LEFT JOIN FORMAS_PAGO f ON v.VEN_FPAGO_ID = f.FPG_ID
       ORDER BY v.VEN_ID DESC
     `;
     const result = await executeQuery<any>(sql);
@@ -36,7 +37,7 @@ router.get('/', async (req, res) => {
       notes: row.VEN_OBSERVACIONES,
       clientName: `${row.CLI_NOMBRE || ''} ${row.CLI_APELLIDO || ''}`.trim(),
       employeeName: `${row.EMP_NOMBRE || ''} ${row.EMP_APELLIDO || ''}`.trim(),
-      paymentMethodName: row.FPA_DESCRIPCION || 'Efectivo'
+      paymentMethodName: row.FPG_NOMBRE || 'Efectivo'
     })) || [];
     res.json(sales);
   } catch (err: any) {
@@ -81,10 +82,10 @@ router.get('/:id/items', async (req, res) => {
 // GET payment methods
 router.get('/payment-methods', async (req, res) => {
   try {
-    const result = await executeQuery<any>("SELECT FPA_ID, FPA_DESCRIPCION FROM FORMAS_PAGO WHERE FPA_ACTIVO = 'S'");
+    const result = await executeQuery<any>("SELECT FPG_ID, FPG_NOMBRE FROM FORMAS_PAGO WHERE FPG_ACTIVO = 'S'");
     const methods = result.rows?.map((row: any) => ({
-      id: row.FPA_ID,
-      name: row.FPA_DESCRIPCION
+      id: row.FPG_ID,
+      name: row.FPG_NOMBRE
     })) || [];
     res.json(methods);
   } catch (err: any) {
@@ -94,7 +95,7 @@ router.get('/payment-methods', async (req, res) => {
 });
 
 // POST create sale (Transaction)
-router.post('/', async (req, res) => {
+router.post('/', requireRole('ADMINISTRADOR', 'VENDEDOR', 'CAJERO'), async (req, res) => {
   const { clientId, employeeId, paymentMethodId, subtotal, discount, tax, total, notes, items } = req.body;
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
 
@@ -149,16 +150,7 @@ router.post('/', async (req, res) => {
         subtotal: Number(item.subtotal)
       });
 
-      // 2b. Update stock in PRODUCTOS
-      const updateStockSql = `
-        UPDATE PRODUCTOS 
-        SET PRO_STOCK = PRO_STOCK - :quantity
-        WHERE PRO_ID = :productId
-      `;
-      await connection.execute(updateStockSql, {
-        quantity: Number(item.quantity),
-        productId: Number(item.productId)
-      });
+
     }
 
     // 3. Log in AUDIT_LOGS

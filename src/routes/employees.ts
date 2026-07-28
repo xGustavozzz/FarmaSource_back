@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireRole } from '../middleware/security';
 import { executeQuery } from '../config/db';
 import oracledb from 'oracledb';
 import bcrypt from 'bcryptjs';
@@ -43,7 +44,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST create employee
-router.post('/', async (req, res) => {
+router.post('/', requireRole('ADMINISTRADOR'), async (req, res) => {
   const { firstName, lastName, cedula, role, phone, email, salary } = req.body;
   const usernameHeader = (req.headers['x-user-username'] as string) || 'SYSTEM';
 
@@ -195,7 +196,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT update employee
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('ADMINISTRADOR'), async (req, res) => {
   const { id } = req.params;
   const { firstName, lastName, cedula, role, phone, email, salary, isActive } = req.body;
   const username = (req.headers['x-user-username'] as string) || 'SYSTEM';
@@ -204,12 +205,24 @@ router.put('/:id', async (req, res) => {
     const prevRes = await executeQuery<any>('SELECT EMP_NOMBRE, EMP_APELLIDO, EMP_CARGO FROM EMPLEADOS WHERE EMP_ID = :id', { id: Number(id) });
     const prev = prevRes.rows?.[0];
 
+    // Normalize the role for the DB
+    let roleDb = String(role).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+    if (roleDb.includes('FARMACEUTICO') || roleDb.includes('REGENTE') || roleDb.includes('FARMA')) {
+      roleDb = 'FARMACEUTICO';
+    } else if (roleDb.includes('CAJERO') || roleDb.includes('VENDEDOR')) {
+      roleDb = 'VENDEDOR';
+    } else if (roleDb.includes('AUDITOR')) {
+      roleDb = 'AUDITOR';
+    } else if (roleDb.includes('ADMINISTRADOR') || roleDb.includes('ADMIN')) {
+      roleDb = 'ADMINISTRADOR';
+    }
+
     const sql = `
       UPDATE EMPLEADOS SET
         EMP_NOMBRE = :firstName,
         EMP_APELLIDO = :lastName,
         EMP_CEDULA = :cedula,
-        EMP_CARGO = :role,
+        EMP_CARGO = :roleDb,
         EMP_TELEFONO = :phone,
         EMP_EMAIL = :email,
         EMP_SALARIO = :salary,
@@ -223,7 +236,7 @@ router.put('/:id', async (req, res) => {
       firstName,
       lastName,
       cedula,
-      role,
+      roleDb,
       phone: phone || null,
       email: email || null,
       salary: Number(salary || 0),

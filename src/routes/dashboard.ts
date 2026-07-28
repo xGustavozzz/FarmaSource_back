@@ -123,6 +123,7 @@ router.get('/', async (req, res) => {
       const res = await executeQuery<any>(`
         SELECT AUD_ID, AUD_TABLA, AUD_ACCION, AUD_USUARIO, AUD_FECHA, AUD_PK_VALOR
         FROM V_AUDIT_RESUMEN
+        WHERE AUD_USUARIO <> 'ADMIN_FARMACIA'
         ORDER BY AUD_FECHA DESC
         FETCH FIRST 6 ROWS ONLY
       `);
@@ -138,6 +139,7 @@ router.get('/', async (req, res) => {
       const res = await executeQuery<any>(`
         SELECT AUD_ID, AUD_TABLA, AUD_ACCION, AUD_USUARIO, AUD_FECHA, AUD_PK_VALOR
         FROM AUDIT_LOGS
+        WHERE AUD_USUARIO <> 'ADMIN_FARMACIA'
         ORDER BY AUD_FECHA DESC
         FETCH FIRST 6 ROWS ONLY
       `);

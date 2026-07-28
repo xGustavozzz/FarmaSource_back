@@ -5,6 +5,7 @@ dotenv.config();
 
 export async function initDb() {
   try {
+    oracledb.fetchAsString = [ oracledb.CLOB ];
     await oracledb.createPool({
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,

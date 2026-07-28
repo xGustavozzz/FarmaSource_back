@@ -9,6 +9,7 @@ import clientsRouter from './routes/clients';
 import salesRouter from './routes/sales';
 import employeesRouter from './routes/employees';
 import auditRouter from './routes/audit';
+import purchasesRouter from './routes/purchases';
 
 dotenv.config();
 
@@ -24,10 +25,11 @@ import { authMiddleware, requireRole } from './middleware/security';
 app.use('/api/auth', authRouter);
 app.use('/api/dashboard', authMiddleware, requireRole('ADMINISTRADOR', 'AUDITOR'), dashboardRouter);
 app.use('/api/products', authMiddleware, productsRouter); // GET is public to authenticated users, write is protected in routes/products.ts
-app.use('/api/clients', authMiddleware, requireRole('ADMINISTRADOR', 'VENDEDOR', 'CAJERO'), clientsRouter);
-app.use('/api/sales', authMiddleware, requireRole('ADMINISTRADOR', 'VENDEDOR', 'CAJERO'), salesRouter);
-app.use('/api/employees', authMiddleware, requireRole('ADMINISTRADOR'), employeesRouter);
+app.use('/api/clients', authMiddleware, requireRole('ADMINISTRADOR', 'VENDEDOR', 'CAJERO', 'AUDITOR'), clientsRouter);
+app.use('/api/sales', authMiddleware, requireRole('ADMINISTRADOR', 'VENDEDOR', 'CAJERO', 'AUDITOR'), salesRouter);
+app.use('/api/employees', authMiddleware, requireRole('ADMINISTRADOR', 'AUDITOR'), employeesRouter);
 app.use('/api/audit', authMiddleware, requireRole('ADMINISTRADOR', 'AUDITOR'), auditRouter);
+app.use('/api/purchases', authMiddleware, requireRole('ADMINISTRADOR', 'FARMACEUTICO', 'AUDITOR'), purchasesRouter);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });
