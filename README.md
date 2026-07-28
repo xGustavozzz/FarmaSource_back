@@ -67,8 +67,6 @@ FarmaSource_back/
 | **Nómina** | `GET`/`POST`/`PUT` `/employees` | ✅ | ❌ | ❌ | ❌ |
 | **Bitácoras** | `GET` `/audit` | ✅ | ❌ | ❌ | ✅ |
 
-> [!NOTE]
-> Los roles de **Cajero** y **Vendedor** se unificaron bajo la política de permisos del rol comercial **Vendedor**. El sistema los trata de forma equivalente en todas las capas.
 
 ---
 
@@ -82,10 +80,10 @@ FarmaSource_back/
 Crea un archivo `.env` en la raíz del proyecto backend:
 
 ```env
-PORT=3001
-DB_USER=admin_farmacia
-DB_PASSWORD=Oracle123
-DB_CONNECT_STRING=127.0.0.1:1521/farmaciapdb
+PORT=
+DB_USER=
+DB_PASSWORD=
+DB_CONNECT_STRING=
 ```
 
 ### 3. Instalar Dependencias
@@ -104,9 +102,3 @@ El backend estará disponible en: `http://localhost:3001`.
 npm run build
 ```
 Genera la carpeta `dist/` con el código transpilado a JavaScript limpio.
-
----
-
-## 🤝 Contribuciones y Desarrollo
-
-Las consultas de lectura y modificaciones transaccionales deben seguir las directrices de inmutabilidad del sistema de auditoría. Asegúrate de verificar las restricciones de la base de datos antes de realizar cambios de esquema.
