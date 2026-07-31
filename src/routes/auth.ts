@@ -159,7 +159,8 @@ router.post('/generate-2fa-secret', authMiddleware, async (req: any, res) => {
 
     const tempSecret = speakeasy.generateSecret({
       name: `FarmaSecure (${user.USU_EMAIL || user.USU_USERNAME})`,
-      issuer: 'FarmaSecure'
+      issuer: 'FarmaSecure',
+      otpauth_url: true
     });
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
